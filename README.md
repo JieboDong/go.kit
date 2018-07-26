@@ -6,8 +6,8 @@
 
     ·定义业务逻辑的服务模型接口
     type Service interface{
-    		GetAge(string) int error
-    		Save(interface{}) int error
+    	GetAge(string) int error
+    	Save(interface{}) int error
     }
 	·创建一个实现服务模型的结构体,并调用服务模型声明的接口
 	type service struct{}
