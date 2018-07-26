@@ -6,8 +6,7 @@
 
     ·定义业务逻辑的服务模型接口
     type Service interface{
-    	GetAge(string) int error
-    	Save(interface{}) int error
+    	GetAge(string) (int error)
     }
 	·创建一个实现服务模型的结构体,并调用服务模型声明的接口
 	type service struct{}
@@ -16,16 +15,15 @@
 			return nil,errors.New("不能传入空姓名")
 		} 
 		//业务逻辑处理
-		a:=12
-		return a,nil
+		return 23, nil
 	}
 	·定义请求和响应数据的结构体
 	  //定义获取用户年龄请求字段
-	type AgeResquest struct{
+	type ageResquest struct{
 	    Name string `json:"name"`
 	}
 	//响应用户请求
-    type AgeResponse struct{
+    type ageResponse struct{
         Age int    `json:"age"`
     }
     这些定义完，我们就该为这几个服务创建端点了
