@@ -21,11 +21,14 @@
 	}
 	·定义请求和响应数据的结构体
 	  //定义获取用户年龄请求字段
-	type User struct{
-
+	type AgeResquest struct{
 	    Name string `json:"name"`
-
 	}
+	//响应用户请求
+    type AgeResponse struct{
+        Age int    `json:"age"`
+    }
+    这些定义完，我们就该为这几个服务创建端点了
 
 	·
 
