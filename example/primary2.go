@@ -10,9 +10,13 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/metrics"
 
 	"github.com/go-kit/kit/endpoint"
+	kitprometheus "github.com/go-kit/kit/metrics/prometheus"
 	httptransport "github.com/go-kit/kit/transport/http"
+	stdprometheus "github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 //声明服务模型
@@ -105,23 +109,61 @@ func (mw loggingMiddleware) GetAge(ctx context.Context, s string) (output int, e
 		)
 	}(time.Now())
 	fmt.Println(s)
+	output, err = mw.next.GetAge(ctx, s) //触发服务主体函数，获取输出值
+	return
+}
+
+//应用监控
+type instrumentingMiddleware struct {
+	requestCount   metrics.Counter
+	requestLatency metrics.Histogram
+	// countResult    metrics.Histogram
+	next Service
+}
+
+func (mw instrumentingMiddleware) GetAge(ctx context.Context, s string) (output int, err error) {
+	defer func(begin time.Time) {
+		lvs := []string{"method", "GetAge", "error", fmt.Sprint(err != nil)}
+		mw.requestCount.With(lvs...).Add(1)                                 //统计请求次数
+		mw.requestLatency.With(lvs...).Observe(time.Since(begin).Seconds()) //统计响应时间
+	}(time.Now())
 	output, err = mw.next.GetAge(ctx, s)
 	return
 }
 
 func main() {
-	logger := log.NewLogfmtLogger(os.Stderr) //定义日志输出类型 标准错误输出
-	// mid := loggingMiddleware(log.With(logger, "method", "age"))
+
+	logger := log.NewLogfmtLogger(os.Stderr)
+
+	fieldKeys := []string{"method", "error"}
+	//请求次数统计
+	requestCount := kitprometheus.NewCounterFrom(stdprometheus.CounterOpts{
+		Namespace: "sms",
+		Subsystem: "sms_send",
+		Name:      "send",
+		Help:      "请求次数统计",
+	}, fieldKeys)
+	//请求延迟统计
+	requestLatency := kitprometheus.NewSummaryFrom(stdprometheus.SummaryOpts{
+		Namespace: "sms",
+		Subsystem: "sms_time",
+		Name:      "time",
+		Help:      "延迟统计",
+	}, fieldKeys)
+
 	var s Service
 	s = service{}
 	s = loggingMiddleware{logger, s}
-	fmt.Printf("%v", s)
+	s = instrumentingMiddleware{requestCount, requestLatency, s}
+
 	getAgeHandler := httptransport.NewServer(
 		makeGetAgepoint(s),
 		decodeAgeRequest,
 		encodeAgeResponse,
 	)
 	http.Handle("/age", getAgeHandler)
+	http.Handle("/metrics", promhttp.Handler())
+
 	http.ListenAndServe(":9091", nil)
 }
 
