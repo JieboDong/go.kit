@@ -4,7 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
+	"os"
+	"time"
+
+	"github.com/go-kit/kit/log"
 
 	"github.com/go-kit/kit/endpoint"
 	httptransport "github.com/go-kit/kit/transport/http"
@@ -60,6 +65,7 @@ type ageResponse struct {
 }
 
 //端点创建
+
 func makeGetAgepoint(s Service) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
 		req := request.(ageRequest)
@@ -71,10 +77,45 @@ func makeGetAgepoint(s Service) endpoint.Endpoint {
 	}
 }
 
+//创建一个日志记录中间件
+// func loggingMiddleware(logger log.Logger) endpoint.Middleware {
+
+// 	return func(next endpoint.Endpoint) endpoint.Endpoint {
+// 		return func(ctx context.Context, request interface{}) (interface{}, error) {
+// 			logger.Log("msg", "calling endpoint")
+// 			defer logger.Log("msg", "callend endpoing")
+// 			return next(ctx, request)
+// 		}
+// 	}
+// }
+
+type loggingMiddleware struct {
+	logger log.Logger
+	next   Service
+}
+
+func (mw loggingMiddleware) GetAge(ctx context.Context, s string) (output int, err error) {
+	defer func(begin time.Time) {
+		mw.logger.Log(
+			"method", "age",
+			"input", s,
+			"output", output,
+			"err", err,
+			"took", time.Since(begin),
+		)
+	}(time.Now())
+	fmt.Println(s)
+	output, err = mw.next.GetAge(ctx, s)
+	return
+}
+
 func main() {
-
-	s := service{}
-
+	logger := log.NewLogfmtLogger(os.Stderr) //定义日志输出类型 标准错误输出
+	// mid := loggingMiddleware(log.With(logger, "method", "age"))
+	var s Service
+	s = service{}
+	s = loggingMiddleware{logger, s}
+	fmt.Printf("%v", s)
 	getAgeHandler := httptransport.NewServer(
 		makeGetAgepoint(s),
 		decodeAgeRequest,
